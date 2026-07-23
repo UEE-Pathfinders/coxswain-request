@@ -6,5 +6,5 @@ Single-file, no build step. Open `index.html` in a browser to use. Edits and the
 
 ## Hosted
 
-- GitHub Pages: https://spamenigma.github.io/coxswain-request/
-- Cloudflare Pages: (added once wired up)
+- GitHub Pages: https://github.com/UEE-Pathfinders/coxswain-request
+- Cloudflare Pages: https://coxswain-request.pages.dev/
