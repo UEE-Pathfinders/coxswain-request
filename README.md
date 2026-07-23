@@ -1,4 +1,5 @@
 # Coxswain Request Template
+v1 Created by LWGN Captain-Solo (5-5)
 
 Star Citizen–styled editable HTML template for material acquisition requests.
 
