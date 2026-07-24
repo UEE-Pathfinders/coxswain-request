@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="70%"><stop stop-color="#123720"/><stop offset=".62" stop-color="#06170c"/><stop offset="1" stop-color="#020704"/></radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#5cff77" stroke-opacity=".06"/></pattern>
+    <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1000" height="600" fill="url(#bg)"/><rect width="1000" height="600" fill="url(#grid)"/>
+  <g fill="none" stroke="#5cff77" filter="url(#glow)">
+    <path stroke-width="6" d="M220 180h560l82 120-82 120H220l-82-120z"/>
+    <circle stroke-width="5" cx="500" cy="300" r="126"/><circle stroke-width="3" cx="500" cy="300" r="72"/>
+    <path stroke-width="3" d="M374 300h252M500 174v252M411 211l178 178M589 211L411 389" opacity=".72"/>
+    <path stroke-width="2" d="M180 120h180M640 120h180M180 480h180M640 480h180" opacity=".5"/>
+  </g>
+  <text x="500" y="545" text-anchor="middle" fill="#5cff77" font-family="monospace" font-size="25" letter-spacing="7">COMPONENT SCHEMATIC</text>
+</svg>
