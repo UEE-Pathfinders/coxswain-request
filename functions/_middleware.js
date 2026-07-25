@@ -28,6 +28,7 @@ export async function onRequest(context) {
 
     const positionCalendar = () => {
       if (calendar.hidden) return;
+
       const margin = 12;
       const gap = 6;
       const rect = button.getBoundingClientRect();
@@ -39,16 +40,11 @@ export async function onRequest(context) {
         window.innerWidth - width - margin
       ) + 'px';
 
-      calendar.style.top = margin + 'px';
+      calendar.style.visibility = 'hidden';
+      calendar.style.top = '0px';
       const height = Math.min(calendar.scrollHeight, window.innerHeight - margin * 2);
-      const spaceBelow = window.innerHeight - rect.bottom - margin;
-      const spaceAbove = rect.top - margin;
-      const openAbove = spaceAbove > spaceBelow;
-      const top = openAbove
-        ? Math.max(margin, rect.top - height - gap)
-        : Math.min(rect.bottom + gap, window.innerHeight - height - margin);
-
-      calendar.style.top = Math.max(margin, top) + 'px';
+      calendar.style.top = Math.max(margin, rect.top - height - gap) + 'px';
+      calendar.style.visibility = 'visible';
     };
 
     const observer = new MutationObserver(() => {
@@ -58,7 +54,7 @@ export async function onRequest(context) {
 
     button.addEventListener('click', () => requestAnimationFrame(positionCalendar));
     window.addEventListener('resize', positionCalendar);
-    document.querySelector('.terminal-view[data-view="configure"]')?.addEventListener('scroll', positionCalendar);
+    window.addEventListener('scroll', positionCalendar, true);
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
