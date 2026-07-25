@@ -45,6 +45,23 @@
     .command-input input { font-size: 24.32px !important; }
     .output-summary > h2 { font-size: 19.84px !important; }
 
+    /* The long Request title must not flex-compress beside NEW SEARCH. */
+    .screen-title-row.compact-title > div:first-child {
+      flex: 0 0 auto !important;
+      min-width: max-content !important;
+    }
+    #configureTitle {
+      display: block !important;
+      width: max-content !important;
+      min-width: max-content !important;
+      white-space: nowrap !important;
+      font-size: 35.84px !important;
+      line-height: 1.05 !important;
+    }
+    .screen-title-row.compact-title > .terminal-button {
+      flex: 0 0 auto !important;
+    }
+
     .login-console {
       padding: 20px 89.6px 58px !important;
     }
