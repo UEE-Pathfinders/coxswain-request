@@ -44,25 +44,25 @@ export async function onRequest(context) {
     left: 0;
     right: 0;
     top: 100%;
-    height: 84px;
+    height: 40px;
     pointer-events: none;
     background: linear-gradient(
       to bottom,
       rgba(117, 217, 135, 0) 0%,
-      rgba(117, 217, 135, .025) 24%,
-      rgba(117, 217, 135, .11) 48%,
-      rgba(117, 217, 135, .035) 62%,
+      rgba(117, 217, 135, .015) 30%,
+      rgba(117, 217, 135, .07) 50%,
+      rgba(117, 217, 135, .018) 70%,
       rgba(117, 217, 135, 0) 100%
     );
     mix-blend-mode: screen;
     transform: translate3d(0, 0, 0);
     will-change: transform;
-    animation: crt-scan-band-rise 4.8s linear infinite;
+    animation: crt-scan-band-rise 7.5s linear infinite;
   }
 
   @keyframes crt-scan-band-rise {
     from { transform: translate3d(0, 0, 0); }
-    to { transform: translate3d(0, calc(-100vh - 168px), 0); }
+    to { transform: translate3d(0, calc(-100vh - 80px), 0); }
   }
 
   @media (prefers-reduced-motion: reduce) {
