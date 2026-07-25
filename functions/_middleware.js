@@ -17,6 +17,39 @@ export async function onRequest(context) {
     max-height: calc(100vh - 24px) !important;
     overflow-y: auto !important;
   }
+
+  /* Compositor-only CRT movement above text, outlines and panels. */
+  .monitor-screen > .scanlines {
+    position: absolute !important;
+    inset: -4px 0 0 !important;
+    z-index: 90 !important;
+    pointer-events: none !important;
+    opacity: .72 !important;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, .14) 2px,
+      rgba(0, 0, 0, .14) 3px,
+      rgba(117, 217, 135, .025) 3px,
+      rgba(117, 217, 135, .025) 4px
+    ) !important;
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+    animation: crt-scanlines-rise 2.4s linear infinite !important;
+  }
+
+  @keyframes crt-scanlines-rise {
+    from { transform: translate3d(0, 0, 0); }
+    to { transform: translate3d(0, -4px, 0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .monitor-screen > .scanlines {
+      animation: none !important;
+      will-change: auto;
+    }
+  }
 </style>
 <script>
 (() => {
