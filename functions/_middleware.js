@@ -6,69 +6,25 @@ export async function onRequest(context) {
 
   const html = await response.text();
   const patch = `
-<style id="calendar-anchor-fix-v4">
-  #requestDateCalendar.sc-calendar {
-    position: fixed !important;
-    inset: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    z-index: 2147483000 !important;
-    width: min(286px, calc(100vw - 24px)) !important;
-    max-height: calc(100vh - 24px) !important;
-    overflow-y: auto !important;
+<style id="calendar-anchor-fix-v5">
+  .sc-date-field {
+    position: relative !important;
   }
-</style>
-<script>
-(() => {
-  const setup = () => {
-    const button = document.getElementById('requestDateButton');
-    const calendar = document.getElementById('requestDateCalendar');
-    if (!button || !calendar) return;
 
-    document.body.appendChild(calendar);
-
-    const positionCalendar = () => {
-      if (calendar.hidden) return;
-
-      const margin = 12;
-      const gap = 6;
-      const rect = button.getBoundingClientRect();
-      const width = Math.min(286, window.innerWidth - margin * 2);
-
-      calendar.style.width = width + 'px';
-      calendar.style.left = Math.max(
-        margin,
-        Math.min(rect.right - width, window.innerWidth - width - margin)
-      ) + 'px';
-
-      calendar.style.top = '0px';
-      calendar.style.visibility = 'hidden';
-      const height = calendar.getBoundingClientRect().height || calendar.scrollHeight;
-      calendar.style.top = Math.max(margin, rect.top - height - gap) + 'px';
-      calendar.style.visibility = 'visible';
-    };
-
-    const repositionAfterOpen = () => {
-      requestAnimationFrame(() => {
-        positionCalendar();
-        requestAnimationFrame(positionCalendar);
-      });
-      setTimeout(positionCalendar, 40);
-      setTimeout(positionCalendar, 120);
-    };
-
-    button.addEventListener('click', repositionAfterOpen, true);
-    const observer = new MutationObserver(repositionAfterOpen);
-    observer.observe(calendar, { attributes: true, attributeFilter: ['hidden'] });
-    window.addEventListener('resize', positionCalendar);
-    window.addEventListener('scroll', positionCalendar, true);
-  };
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
-  else setup();
-})();
-</script>`;
+  #requestDateCalendar.sc-calendar {
+    position: absolute !important;
+    right: 0 !important;
+    left: auto !important;
+    top: auto !important;
+    bottom: calc(100% + 6px) !important;
+    inset: auto 0 calc(100% + 6px) auto !important;
+    transform: none !important;
+    z-index: 1000 !important;
+    width: min(286px, calc(100vw - 24px)) !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+</style>`;
 
   const patched = html.includes("</head>")
     ? html.replace("</head>", `${patch}</head>`)
