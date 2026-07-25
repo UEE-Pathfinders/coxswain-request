@@ -1,0 +1,12 @@
+.sc-calendar {
+  position: fixed !important;
+  top: auto !important;
+  right: 12px !important;
+  bottom: 12px !important;
+  left: auto !important;
+  z-index: 1000 !important;
+  width: min(286px, calc(100vw - 24px)) !important;
+  max-height: calc(100vh - 24px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
