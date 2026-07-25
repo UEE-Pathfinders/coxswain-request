@@ -197,6 +197,34 @@
       <img class="bezel-overlay" src="assets/crt-bezel-overlay.png" alt="" aria-hidden="true">
     </section>
   </main>
+  <script>
+    /* The export renderer in app.js deliberately truncates its 34px canvas title.
+       Replace only that generated title with the complete review heading and
+       shrink it just enough to fit the fixed 320px export panel. */
+    (() => {
+      const nativeFillText = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (text, x, y, maxWidth) {
+        const rendered = String(text ?? "");
+        const heading = document.getElementById("outputItemName")?.textContent?.trim();
+        const isExportHeading = heading && rendered.endsWith("…") && /\b34px\b/.test(this.font) && y >= 210 && y <= 240;
+
+        if (!isExportHeading) {
+          return nativeFillText.call(this, text, x, y, maxWidth);
+        }
+
+        const originalFont = this.font;
+        let size = 34;
+        do {
+          size -= 1;
+          this.font = originalFont.replace(/\b34px\b/, `${size}px`);
+        } while (size > 16 && this.measureText(heading).width > 320);
+
+        const result = nativeFillText.call(this, heading, x, y, maxWidth);
+        this.font = originalFont;
+        return result;
+      };
+    })();
+  </script>
   <script src="app.js" defer></script>
 </body>
 </html>
