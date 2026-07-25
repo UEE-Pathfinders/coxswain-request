@@ -32,27 +32,28 @@
     }
     .sc-date-control input[type="text"] { min-width: 0; }
     .sc-date-button {
+      display: grid;
+      place-items: center;
       border: 1px solid var(--green-soft);
       background: #021007;
       color: var(--green);
       cursor: pointer;
-      font-size: 18px;
       line-height: 1;
       padding: 0;
+    }
+    .sc-date-button svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
     }
     .sc-date-button:hover,
     .sc-date-button:focus-visible {
       border-color: var(--green);
-      background: var(--green-faint);
+      background: var(--green);
+      color: #001b06;
       outline: 0;
-    }
-    .sc-date-help {
-      display: block;
-      margin-top: 4px;
-      color: var(--green-soft);
-      font-size: 8px;
-      line-height: 1.25;
-      letter-spacing: 0;
     }
     #requestDatePicker {
       position: fixed;
@@ -159,10 +160,9 @@
                 <label class="field">REQUESTOR<input id="requestor" data-bind="requestor" type="text"></label>
                 <label class="field">REQUEST DATE
                   <span class="sc-date-control">
-                    <input id="requestDate" data-bind="requestDate" type="text" placeholder="19th July 2956" aria-describedby="requestDateHelp">
-                    <button type="button" class="sc-date-button" id="requestDateButton" aria-label="Choose request date" title="Choose Earth date and convert to Star Citizen year">&#128197;</button>
+                    <input id="requestDate" data-bind="requestDate" type="text" placeholder="19th July 2956">
+                    <button type="button" class="sc-date-button" id="requestDateButton" aria-label="Select date" title="Select date"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/></svg></button>
                   </span>
-                  <small class="sc-date-help" id="requestDateHelp">Select an Earth calendar date; the terminal adds 930 years. The day is read directly, without timezone conversion.</small>
                   <input id="requestDatePicker" type="date" tabindex="-1" aria-hidden="true">
                 </label>
                 <label class="field wide">PICKUP / DELIVERY<input id="contact" data-bind="contact" type="text"></label>
@@ -269,44 +269,51 @@
       };
     })();
   </script>
-  <script src="app.js" defer></script>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const display = document.getElementById("requestDate");
-      const picker = document.getElementById("requestDatePicker");
-      const button = document.getElementById("requestDateButton");
-      if (!display || !picker || !button) return;
-
+    (() => {
+      const SC_YEAR_OFFSET = 930;
       const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-      const ordinal = day => {
+
+      function ordinal(day) {
         const mod100 = day % 100;
         if (mod100 >= 11 && mod100 <= 13) return `${day}th`;
-        return `${day}${({1:"st",2:"nd",3:"rd"})[day % 10] || "th"}`;
-      };
-      const todayValue = () => {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        const day = String(now.getDate()).padStart(2, "0");
-        return `${year}-${month}-${day}`;
-      };
-      const openPicker = () => {
-        if (!picker.value) picker.value = todayValue();
-        if (typeof picker.showPicker === "function") picker.showPicker();
-        else picker.click();
-      };
-      button.addEventListener("click", openPicker);
-      picker.addEventListener("change", () => {
-        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(picker.value);
-        if (!match) return;
+        return `${day}${day % 10 === 1 ? "st" : day % 10 === 2 ? "nd" : day % 10 === 3 ? "rd" : "th"}`;
+      }
+
+      function convertSelectedDate(value) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || "");
+        if (!match) return "";
         const earthYear = Number(match[1]);
         const monthIndex = Number(match[2]) - 1;
         const day = Number(match[3]);
-        display.value = `${ordinal(day)} ${months[monthIndex]} ${earthYear + 930}`;
-        display.dispatchEvent(new Event("input", { bubbles: true }));
-        display.dispatchEvent(new Event("change", { bubbles: true }));
-      });
-    });
+        if (monthIndex < 0 || monthIndex > 11 || day < 1 || day > 31) return "";
+        return `${ordinal(day)} ${months[monthIndex]} ${earthYear + SC_YEAR_OFFSET}`;
+      }
+
+      function initialiseStarCitizenDatePicker() {
+        const display = document.getElementById("requestDate");
+        const picker = document.getElementById("requestDatePicker");
+        const button = document.getElementById("requestDateButton");
+        if (!display || !picker || !button) return;
+
+        button.addEventListener("click", () => {
+          if (typeof picker.showPicker === "function") picker.showPicker();
+          else picker.click();
+        });
+
+        picker.addEventListener("change", () => {
+          const converted = convertSelectedDate(picker.value);
+          if (!converted) return;
+          display.value = converted;
+          display.dispatchEvent(new Event("input", { bubbles: true }));
+          display.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      }
+
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initialiseStarCitizenDatePicker);
+      else initialiseStarCitizenDatePicker();
+    })();
   </script>
+  <script src="app.js" defer></script>
 </body>
 </html>
