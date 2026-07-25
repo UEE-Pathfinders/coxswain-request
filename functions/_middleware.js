@@ -57,7 +57,7 @@ export async function onRequest(context) {
     mix-blend-mode: screen;
     transform: translate3d(0, 0, 0);
     will-change: transform;
-    animation: crt-scan-band-rise 7.5s linear infinite;
+    animation: crt-scan-band-rise 8.5s linear infinite;
   }
 
   @keyframes crt-scan-band-rise {
