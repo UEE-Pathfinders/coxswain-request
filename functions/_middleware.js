@@ -10,6 +10,9 @@ export async function onRequest(context) {
   #requestDateCalendar.sc-calendar {
     position: fixed !important;
     inset: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
     z-index: 2147483000 !important;
     width: min(286px, calc(100vw - 24px)) !important;
     max-height: calc(100vh - 24px) !important;
@@ -20,8 +23,9 @@ export async function onRequest(context) {
 (() => {
   const setup = () => {
     const button = document.getElementById('requestDateButton');
+    const field = button?.closest('.sc-date-field');
     const calendar = document.getElementById('requestDateCalendar');
-    if (!button || !calendar || calendar.dataset.viewportFixed === 'true') return;
+    if (!button || !field || !calendar || calendar.dataset.viewportFixed === 'true') return;
 
     calendar.dataset.viewportFixed = 'true';
     document.body.appendChild(calendar);
@@ -31,7 +35,7 @@ export async function onRequest(context) {
 
       const margin = 12;
       const gap = 6;
-      const rect = button.getBoundingClientRect();
+      const rect = field.getBoundingClientRect();
       const width = Math.min(286, window.innerWidth - margin * 2);
 
       calendar.style.width = width + 'px';
@@ -47,12 +51,16 @@ export async function onRequest(context) {
       calendar.style.visibility = 'visible';
     };
 
+    const queuePosition = () => {
+      requestAnimationFrame(() => requestAnimationFrame(positionCalendar));
+    };
+
     const observer = new MutationObserver(() => {
-      if (!calendar.hidden) requestAnimationFrame(positionCalendar);
+      if (!calendar.hidden) queuePosition();
     });
     observer.observe(calendar, { attributes: true, attributeFilter: ['hidden'] });
 
-    button.addEventListener('click', () => requestAnimationFrame(positionCalendar));
+    button.addEventListener('click', queuePosition);
     window.addEventListener('resize', positionCalendar);
     window.addEventListener('scroll', positionCalendar, true);
   };
