@@ -27,6 +27,24 @@
     };
   };
 
+  const updateExportCopy = () => {
+    const data = getData();
+    if (!data) return;
+
+    const typeCount = data.items.length;
+    const totalQuantity = data.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const requestor = String(data.requestor || "").trim() || "UNSPECIFIED";
+    const summary = $("exportSummary");
+    const status = $("exportStatus");
+
+    if (summary) {
+      summary.textContent = `${typeCount} item type${typeCount === 1 ? "" : "s"} // ${totalQuantity} total item${totalQuantity === 1 ? "" : "s"} request prepared for ${requestor}.`;
+    }
+    if (status && !/RENDERING|DOWNLOADED|COPIED|FAILED/.test(status.textContent || "")) {
+      status.textContent = `MULTI-ITEM MANIFEST LOADED // ${typeCount} TYPES // ${totalQuantity} TOTAL ITEMS`;
+    }
+  };
+
   const loadImage = src => new Promise(resolve => {
     if (!src) return resolve(null);
     const image = new Image();
@@ -329,7 +347,24 @@
     intercept("copyImageButton", copyImage);
     intercept("downloadPngButton", downloadPng);
     intercept("downloadPdfButton", downloadPdf);
-    window.coxswainMultiExport = { renderCanvas };
+
+    $("continueExportButton")?.addEventListener("click", () => {
+      requestAnimationFrame(() => requestAnimationFrame(updateExportCopy));
+      setTimeout(updateExportCopy, 80);
+    }, true);
+
+    document.querySelector('[data-step="export"]')?.addEventListener("click", () => {
+      requestAnimationFrame(() => requestAnimationFrame(updateExportCopy));
+    });
+
+    const exportView = document.querySelector('.terminal-view[data-view="export"]');
+    if (exportView) {
+      new MutationObserver(() => {
+        if (exportView.classList.contains("active")) updateExportCopy();
+      }).observe(exportView, { attributes: true, attributeFilter: ["class"] });
+    }
+
+    window.coxswainMultiExport = { renderCanvas, updateExportCopy };
   };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup);
