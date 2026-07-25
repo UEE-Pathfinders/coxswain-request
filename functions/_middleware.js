@@ -18,35 +18,57 @@ export async function onRequest(context) {
     overflow-y: auto !important;
   }
 
-  /* Compositor-only CRT movement above text, outlines and panels. */
+  /* Static fine scanlines above text, outlines and panels. */
   .monitor-screen > .scanlines {
     position: absolute !important;
-    inset: -4px 0 0 !important;
+    inset: 0 !important;
     z-index: 90 !important;
     pointer-events: none !important;
-    opacity: .72 !important;
+    overflow: hidden !important;
+    opacity: 1 !important;
     background: repeating-linear-gradient(
       to bottom,
       rgba(0, 0, 0, 0) 0,
       rgba(0, 0, 0, 0) 2px,
-      rgba(0, 0, 0, .14) 2px,
-      rgba(0, 0, 0, .14) 3px,
-      rgba(117, 217, 135, .025) 3px,
-      rgba(117, 217, 135, .025) 4px
+      rgba(0, 0, 0, .13) 2px,
+      rgba(0, 0, 0, .13) 3px,
+      rgba(117, 217, 135, .02) 3px,
+      rgba(117, 217, 135, .02) 4px
     ) !important;
-    transform: translate3d(0, 0, 0);
-    will-change: transform;
-    animation: crt-scanlines-rise 2.4s linear infinite !important;
   }
 
-  @keyframes crt-scanlines-rise {
+  /* One compositor-driven scan band moving through the whole display. */
+  .monitor-screen > .scanlines::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 84px;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(117, 217, 135, 0) 0%,
+      rgba(117, 217, 135, .025) 24%,
+      rgba(117, 217, 135, .11) 48%,
+      rgba(117, 217, 135, .035) 62%,
+      rgba(117, 217, 135, 0) 100%
+    );
+    mix-blend-mode: screen;
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+    animation: crt-scan-band-rise 4.8s linear infinite;
+  }
+
+  @keyframes crt-scan-band-rise {
     from { transform: translate3d(0, 0, 0); }
-    to { transform: translate3d(0, -4px, 0); }
+    to { transform: translate3d(0, calc(-100vh - 168px), 0); }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .monitor-screen > .scanlines {
+    .monitor-screen > .scanlines::after {
       animation: none !important;
+      display: none;
       will-change: auto;
     }
   }
