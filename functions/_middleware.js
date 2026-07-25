@@ -37,7 +37,7 @@ export async function onRequest(context) {
     ) !important;
   }
 
-  /* One compositor-driven scan band moving through the whole display. */
+  /* Subtle compositor-driven phosphor lift moving through the display. */
   .monitor-screen > .scanlines::after {
     content: "";
     position: absolute;
@@ -48,11 +48,11 @@ export async function onRequest(context) {
     pointer-events: none;
     background: linear-gradient(
       to bottom,
-      rgba(117, 217, 135, 0) 0%,
-      rgba(117, 217, 135, .015) 30%,
-      rgba(117, 217, 135, .07) 50%,
-      rgba(117, 217, 135, .018) 70%,
-      rgba(117, 217, 135, 0) 100%
+      rgba(205, 255, 215, 0) 0%,
+      rgba(205, 255, 215, .008) 32%,
+      rgba(225, 255, 230, .042) 50%,
+      rgba(205, 255, 215, .01) 68%,
+      rgba(205, 255, 215, 0) 100%
     );
     mix-blend-mode: screen;
     transform: translate3d(0, 0, 0);
