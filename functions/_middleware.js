@@ -66,7 +66,8 @@ export async function onRequest(context) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup);
   else setup();
 })();
-</script>`;
+</script>
+<script src="/manifest.js" defer></script>`;
 
   const patched = html.includes("</head>")
     ? html.replace("</head>", `${patch}</head>`)
