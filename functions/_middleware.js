@@ -6,7 +6,7 @@ export async function onRequest(context) {
 
   const html = await response.text();
   const patch = `
-<style id="calendar-viewport-fix">
+<style id="calendar-anchor-fix-v4">
   #requestDateCalendar.sc-calendar {
     position: fixed !important;
     inset: auto !important;
@@ -23,11 +23,9 @@ export async function onRequest(context) {
 (() => {
   const setup = () => {
     const button = document.getElementById('requestDateButton');
-    const field = button?.closest('.sc-date-field');
     const calendar = document.getElementById('requestDateCalendar');
-    if (!button || !field || !calendar || calendar.dataset.viewportFixed === 'true') return;
+    if (!button || !calendar) return;
 
-    calendar.dataset.viewportFixed = 'true';
     document.body.appendChild(calendar);
 
     const positionCalendar = () => {
@@ -35,32 +33,34 @@ export async function onRequest(context) {
 
       const margin = 12;
       const gap = 6;
-      const rect = field.getBoundingClientRect();
+      const rect = button.getBoundingClientRect();
       const width = Math.min(286, window.innerWidth - margin * 2);
 
       calendar.style.width = width + 'px';
-      calendar.style.left = Math.min(
-        Math.max(margin, rect.right - width),
-        window.innerWidth - width - margin
+      calendar.style.left = Math.max(
+        margin,
+        Math.min(rect.right - width, window.innerWidth - width - margin)
       ) + 'px';
 
-      calendar.style.visibility = 'hidden';
       calendar.style.top = '0px';
-      const height = Math.min(calendar.scrollHeight, window.innerHeight - margin * 2);
+      calendar.style.visibility = 'hidden';
+      const height = calendar.getBoundingClientRect().height || calendar.scrollHeight;
       calendar.style.top = Math.max(margin, rect.top - height - gap) + 'px';
       calendar.style.visibility = 'visible';
     };
 
-    const queuePosition = () => {
-      requestAnimationFrame(() => requestAnimationFrame(positionCalendar));
+    const repositionAfterOpen = () => {
+      requestAnimationFrame(() => {
+        positionCalendar();
+        requestAnimationFrame(positionCalendar);
+      });
+      setTimeout(positionCalendar, 40);
+      setTimeout(positionCalendar, 120);
     };
 
-    const observer = new MutationObserver(() => {
-      if (!calendar.hidden) queuePosition();
-    });
+    button.addEventListener('click', repositionAfterOpen, true);
+    const observer = new MutationObserver(repositionAfterOpen);
     observer.observe(calendar, { attributes: true, attributeFilter: ['hidden'] });
-
-    button.addEventListener('click', queuePosition);
     window.addEventListener('resize', positionCalendar);
     window.addEventListener('scroll', positionCalendar, true);
   };
@@ -76,6 +76,7 @@ export async function onRequest(context) {
 
   const headers = new Headers(response.headers);
   headers.delete("content-length");
+  headers.set("cache-control", "no-store, max-age=0");
   return new Response(patched, {
     status: response.status,
     statusText: response.statusText,
