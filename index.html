@@ -8,14 +8,21 @@
   <link rel="stylesheet" href="styles.css">
   <style>
     /* Preserve complete item names in review and exported images. */
+    .output-summary {
+      overflow: visible !important;
+      min-width: 0;
+    }
     .output-summary > h2 {
-      font-size: clamp(17px, 1.85vw, 28px);
-      line-height: 1.08;
-      white-space: normal;
-      overflow-wrap: anywhere;
-      word-break: normal;
-      max-height: 2.2em;
-      overflow: hidden;
+      display: block !important;
+      font-size: clamp(14px, 1.55vw, 23px) !important;
+      line-height: 1.05 !important;
+      white-space: normal !important;
+      overflow: visible !important;
+      text-overflow: clip !important;
+      overflow-wrap: anywhere !important;
+      word-break: break-word !important;
+      max-height: none !important;
+      margin: 0 0 6px !important;
     }
   </style>
 </head>
