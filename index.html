@@ -6,6 +6,18 @@
   <meta name="theme-color" content="#020704">
   <title>UEE Coxswain Request Terminal</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Preserve complete item names in review and exported images. */
+    .output-summary > h2 {
+      font-size: clamp(17px, 1.85vw, 28px);
+      line-height: 1.08;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: normal;
+      max-height: 2.2em;
+      overflow: hidden;
+    }
+  </style>
 </head>
 <body>
   <main class="terminal-wrap">
@@ -98,7 +110,7 @@
               <div class="panel-heading"><h2>REQUEST PARAMETERS</h2><span>AUTO-SAVED</span></div>
               <div class="field-grid">
                 <label class="field wide">ITEM NAME<input id="itemName" data-bind="itemName" type="text"></label>
-                <label class="field">QUANTITY TO CRAFT<input id="requestQuantity" data-bind="requestQuantity" type="number" min="0.01" step="0.01"></label>
+                <label class="field">QUANTITY TO CRAFT<input id="requestQuantity" data-bind="requestQuantity" type="number" min="1" step="1" inputmode="numeric"></label>
                 <label class="field">TARGET QUALITY<input id="globalQuality" data-bind="globalQuality" type="text" placeholder="500+"></label>
                 <label class="field">REQUESTOR<input id="requestor" data-bind="requestor" type="text"></label>
                 <label class="field">REQUEST DATE<input id="requestDate" data-bind="requestDate" type="text"></label>
