@@ -31,6 +31,14 @@
       min-height: 720px !important;
     }
 
+    /* Freeze viewport-relative text until the whole chassis scales. */
+    .terminal-header {
+      font-size: 15.36px !important;
+    }
+    .export-console h1 {
+      font-size: 35.84px !important;
+    }
+
     /* Preserve the native desktop geometry even when viewport media queries fire. */
     .step-nav { grid-template-columns: repeat(4, 1fr) !important; }
     .configure-grid { grid-template-columns: minmax(0, 1.08fr) minmax(330px, .92fr) !important; }
@@ -49,15 +57,15 @@
   const applyScale = () => {
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
-      /* Measure the true fixed-layout chassis height before scaling. */
       wrap.style.transform = "translateX(-50%) scale(1)";
       const nativeHeight = Math.max(1, wrap.offsetHeight);
       const widthScale = (window.innerWidth - VIEWPORT_GUTTER) / NATIVE_WIDTH;
       const heightScale = (window.innerHeight - VIEWPORT_GUTTER) / nativeHeight;
       const scale = Math.min(1, widthScale, heightScale);
+      const safeScale = Math.max(.2, scale);
 
-      wrap.style.transform = `translateX(-50%) scale(${Math.max(.2, scale)})`;
-      document.body.style.minHeight = `${Math.ceil(nativeHeight * Math.max(.2, scale) + 12)}px`;
+      wrap.style.transform = `translateX(-50%) scale(${safeScale})`;
+      document.body.style.minHeight = `${Math.ceil(nativeHeight * safeScale + 12)}px`;
       document.documentElement.style.setProperty("--terminal-scale", String(scale));
     });
   };
