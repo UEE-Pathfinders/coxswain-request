@@ -24,6 +24,7 @@
       max-height: none !important;
       margin: 0 0 6px !important;
     }
+    .sc-date-field { position: relative; }
     .sc-date-control {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 38px;
@@ -49,19 +50,96 @@
       stroke-width: 1.8;
     }
     .sc-date-button:hover,
-    .sc-date-button:focus-visible {
+    .sc-date-button:focus-visible,
+    .sc-date-button[aria-expanded="true"] {
       border-color: var(--green);
       background: var(--green);
       color: #001b06;
       outline: 0;
     }
-    #requestDatePicker {
-      position: fixed;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-      pointer-events: none;
+    .sc-calendar {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 40;
+      width: min(286px, calc(100vw - 70px));
+      border: 1px solid var(--green);
+      background: #001006;
+      color: var(--green);
+      padding: 9px;
+      box-shadow: 0 0 0 2px #001006, 0 0 18px rgba(92,255,119,.22);
     }
+    .sc-calendar[hidden] { display: none; }
+    .sc-calendar-header {
+      display: grid;
+      grid-template-columns: 30px 1fr 30px;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .sc-calendar-title {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .7px;
+    }
+    .sc-calendar-nav,
+    .sc-calendar-today {
+      border: 1px solid var(--green-soft);
+      background: transparent;
+      color: var(--green);
+      cursor: pointer;
+      font: 800 11px "Courier New", monospace;
+    }
+    .sc-calendar-nav { height: 28px; padding: 0; }
+    .sc-calendar-nav:hover,
+    .sc-calendar-nav:focus-visible,
+    .sc-calendar-today:hover,
+    .sc-calendar-today:focus-visible {
+      background: var(--green);
+      color: #001b06;
+      border-color: var(--green);
+      outline: 0;
+    }
+    .sc-calendar-weekdays,
+    .sc-calendar-days {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 3px;
+    }
+    .sc-calendar-weekdays span {
+      text-align: center;
+      color: var(--green-soft);
+      font-size: 8px;
+      padding: 2px 0 4px;
+    }
+    .sc-calendar-day {
+      min-width: 0;
+      height: 27px;
+      border: 1px solid transparent;
+      background: rgba(0,25,7,.32);
+      color: var(--green);
+      cursor: pointer;
+      padding: 0;
+      font: 700 10px "Courier New", monospace;
+    }
+    .sc-calendar-day:hover,
+    .sc-calendar-day:focus-visible {
+      border-color: var(--green);
+      background: var(--green-faint);
+      outline: 0;
+    }
+    .sc-calendar-day.is-today { border-color: var(--green-soft); }
+    .sc-calendar-day.is-selected { background: var(--green); color: #001b06; }
+    .sc-calendar-day.is-empty { visibility: hidden; pointer-events: none; }
+    .sc-calendar-footer {
+      display: flex;
+      justify-content: flex-end;
+      border-top: 1px solid var(--green-faint);
+      margin-top: 8px;
+      padding-top: 8px;
+    }
+    .sc-calendar-today { padding: 5px 10px; }
   </style>
 </head>
 <body>
@@ -158,12 +236,21 @@
                 <label class="field">QUANTITY TO CRAFT<input id="requestQuantity" data-bind="requestQuantity" type="number" min="1" step="1" inputmode="numeric"></label>
                 <label class="field">TARGET QUALITY<input id="globalQuality" data-bind="globalQuality" type="text" placeholder="500+"></label>
                 <label class="field">REQUESTOR<input id="requestor" data-bind="requestor" type="text"></label>
-                <label class="field">REQUEST DATE
+                <label class="field sc-date-field">REQUEST DATE
                   <span class="sc-date-control">
                     <input id="requestDate" data-bind="requestDate" type="text" placeholder="19th July 2956">
-                    <button type="button" class="sc-date-button" id="requestDateButton" aria-label="Select date" title="Select date"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/></svg></button>
+                    <button type="button" class="sc-date-button" id="requestDateButton" aria-label="Select date" title="Select date" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v3M17 2v3M3.5 9h17M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V6A1.5 1.5 0 0 1 5 4.5Z"/></svg></button>
                   </span>
-                  <input id="requestDatePicker" type="date" tabindex="-1" aria-hidden="true">
+                  <div class="sc-calendar" id="requestDateCalendar" role="dialog" aria-label="Select request date" hidden>
+                    <div class="sc-calendar-header">
+                      <button type="button" class="sc-calendar-nav" id="calendarPrevious" aria-label="Previous month">&lt;</button>
+                      <div class="sc-calendar-title" id="calendarTitle"></div>
+                      <button type="button" class="sc-calendar-nav" id="calendarNext" aria-label="Next month">&gt;</button>
+                    </div>
+                    <div class="sc-calendar-weekdays" aria-hidden="true"><span>MO</span><span>TU</span><span>WE</span><span>TH</span><span>FR</span><span>SA</span><span>SU</span></div>
+                    <div class="sc-calendar-days" id="calendarDays"></div>
+                    <div class="sc-calendar-footer"><button type="button" class="sc-calendar-today" id="calendarToday">TODAY</button></div>
+                  </div>
                 </label>
                 <label class="field wide">PICKUP / DELIVERY<input id="contact" data-bind="contact" type="text"></label>
               </div>
@@ -269,51 +356,108 @@
       };
     })();
   </script>
+  <script src="app.js" defer></script>
   <script>
-    (() => {
-      const SC_YEAR_OFFSET = 930;
-      const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    document.addEventListener("DOMContentLoaded", () => {
+      const display = document.getElementById("requestDate");
+      const button = document.getElementById("requestDateButton");
+      const calendar = document.getElementById("requestDateCalendar");
+      const title = document.getElementById("calendarTitle");
+      const days = document.getElementById("calendarDays");
+      const previous = document.getElementById("calendarPrevious");
+      const next = document.getElementById("calendarNext");
+      const todayButton = document.getElementById("calendarToday");
+      if (!display || !button || !calendar || !title || !days || !previous || !next || !todayButton) return;
 
-      function ordinal(day) {
+      const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const ordinal = day => {
         const mod100 = day % 100;
         if (mod100 >= 11 && mod100 <= 13) return `${day}th`;
-        return `${day}${day % 10 === 1 ? "st" : day % 10 === 2 ? "nd" : day % 10 === 3 ? "rd" : "th"}`;
+        return `${day}${({1:"st",2:"nd",3:"rd"})[day % 10] || "th"}`;
+      };
+      const earthToday = new Date();
+      let viewYear = earthToday.getFullYear();
+      let viewMonth = earthToday.getMonth();
+      let selected = null;
+
+      function formatStarCitizenDate(year, month, day) {
+        return `${ordinal(day)} ${months[month]} ${year + 930}`;
       }
 
-      function convertSelectedDate(value) {
-        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || "");
-        if (!match) return "";
-        const earthYear = Number(match[1]);
-        const monthIndex = Number(match[2]) - 1;
-        const day = Number(match[3]);
-        if (monthIndex < 0 || monthIndex > 11 || day < 1 || day > 31) return "";
-        return `${ordinal(day)} ${months[monthIndex]} ${earthYear + SC_YEAR_OFFSET}`;
+      function saveDate(year, month, day) {
+        selected = { year, month, day };
+        display.value = formatStarCitizenDate(year, month, day);
+        display.dispatchEvent(new Event("input", { bubbles: true }));
+        display.dispatchEvent(new Event("change", { bubbles: true }));
+        closeCalendar();
       }
 
-      function initialiseStarCitizenDatePicker() {
-        const display = document.getElementById("requestDate");
-        const picker = document.getElementById("requestDatePicker");
-        const button = document.getElementById("requestDateButton");
-        if (!display || !picker || !button) return;
+      function renderCalendar() {
+        title.textContent = `${months[viewMonth].toUpperCase()} ${viewYear + 930}`;
+        days.replaceChildren();
+        const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+        const mondayOffset = (firstDay + 6) % 7;
+        const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
 
-        button.addEventListener("click", () => {
-          if (typeof picker.showPicker === "function") picker.showPicker();
-          else picker.click();
-        });
+        for (let i = 0; i < mondayOffset; i += 1) {
+          const empty = document.createElement("button");
+          empty.type = "button";
+          empty.className = "sc-calendar-day is-empty";
+          empty.tabIndex = -1;
+          days.appendChild(empty);
+        }
 
-        picker.addEventListener("change", () => {
-          const converted = convertSelectedDate(picker.value);
-          if (!converted) return;
-          display.value = converted;
-          display.dispatchEvent(new Event("input", { bubbles: true }));
-          display.dispatchEvent(new Event("change", { bubbles: true }));
-        });
+        for (let day = 1; day <= daysInMonth; day += 1) {
+          const dayButton = document.createElement("button");
+          dayButton.type = "button";
+          dayButton.className = "sc-calendar-day";
+          dayButton.textContent = String(day);
+          dayButton.setAttribute("aria-label", `${day} ${months[viewMonth]} ${viewYear}`);
+          if (viewYear === earthToday.getFullYear() && viewMonth === earthToday.getMonth() && day === earthToday.getDate()) dayButton.classList.add("is-today");
+          if (selected && selected.year === viewYear && selected.month === viewMonth && selected.day === day) dayButton.classList.add("is-selected");
+          dayButton.addEventListener("click", () => saveDate(viewYear, viewMonth, day));
+          days.appendChild(dayButton);
+        }
       }
 
-      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initialiseStarCitizenDatePicker);
-      else initialiseStarCitizenDatePicker();
-    })();
+      function openCalendar() {
+        if (selected) {
+          viewYear = selected.year;
+          viewMonth = selected.month;
+        } else {
+          viewYear = earthToday.getFullYear();
+          viewMonth = earthToday.getMonth();
+        }
+        renderCalendar();
+        calendar.hidden = false;
+        button.setAttribute("aria-expanded", "true");
+      }
+
+      function closeCalendar() {
+        calendar.hidden = true;
+        button.setAttribute("aria-expanded", "false");
+      }
+
+      button.addEventListener("click", event => {
+        event.stopPropagation();
+        if (calendar.hidden) openCalendar();
+        else closeCalendar();
+      });
+      previous.addEventListener("click", () => {
+        viewMonth -= 1;
+        if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
+        renderCalendar();
+      });
+      next.addEventListener("click", () => {
+        viewMonth += 1;
+        if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
+        renderCalendar();
+      });
+      todayButton.addEventListener("click", () => saveDate(earthToday.getFullYear(), earthToday.getMonth(), earthToday.getDate()));
+      calendar.addEventListener("click", event => event.stopPropagation());
+      document.addEventListener("click", closeCalendar);
+      document.addEventListener("keydown", event => { if (event.key === "Escape") closeCalendar(); });
+    });
   </script>
-  <script src="app.js" defer></script>
 </body>
 </html>
