@@ -37,7 +37,7 @@ export async function onRequest(context) {
     ) !important;
   }
 
-  /* Subtle compositor-driven phosphor lift moving through the display. */
+  /* Visible but restrained compositor-driven phosphor lift. */
   .monitor-screen > .scanlines::after {
     content: "";
     position: absolute;
@@ -49,9 +49,9 @@ export async function onRequest(context) {
     background: linear-gradient(
       to bottom,
       rgba(205, 255, 215, 0) 0%,
-      rgba(205, 255, 215, .008) 32%,
-      rgba(225, 255, 230, .042) 50%,
-      rgba(205, 255, 215, .01) 68%,
+      rgba(205, 255, 215, .014) 32%,
+      rgba(230, 255, 235, .085) 50%,
+      rgba(205, 255, 215, .017) 68%,
       rgba(205, 255, 215, 0) 100%
     );
     mix-blend-mode: screen;
