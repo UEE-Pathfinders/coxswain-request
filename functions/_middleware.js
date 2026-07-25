@@ -69,7 +69,8 @@ export async function onRequest(context) {
 </script>
 <script src="/manifest.js" defer></script>
 <script src="/multi-review.js" defer></script>
-<script src="/review-bridge.js" defer></script>`;
+<script src="/review-bridge.js" defer></script>
+<script src="/multi-export.js" defer></script>`;
 
   const patched = html.includes("</head>")
     ? html.replace("</head>", `${patch}</head>`)
