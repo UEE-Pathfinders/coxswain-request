@@ -8,6 +8,8 @@
     original.replaceWith(button);
 
     button.addEventListener("click", () => {
+      const manifest = window.coxswainManifest;
+      if (manifest?.isEnabled?.() && !manifest.commitCurrentForReview?.()) return;
       document.querySelector('[data-step="review"]')?.click();
     });
   };
