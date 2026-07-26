@@ -35,7 +35,7 @@ async function search(requestUrl) {
     seen.add(key);
     return true;
   });
-  return json({ results }, 200, 900);
+  return json({ results });
 }
 
 async function searchGameData(query) {
