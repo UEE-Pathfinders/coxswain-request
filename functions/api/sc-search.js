@@ -18,24 +18,30 @@ async function search(requestUrl) {
   const query = (requestUrl.searchParams.get("q") || "").trim();
   if (query.length < 2 || query.length > 64) return json({ error: "Query must contain 2–64 characters." }, 400);
 
-  const [apiResults, wikiResults] = await Promise.allSettled([searchGameData(query), searchWikiPages(query)]);
+  const [apiResults, baseItemResults, wikiResults] = await Promise.allSettled([
+    searchGameData(query),
+    searchBaseItems(query),
+    searchWikiPages(query)
+  ]);
   const combined = [
+    ...(baseItemResults.status === "fulfilled" ? baseItemResults.value : []),
     ...(apiResults.status === "fulfilled" ? apiResults.value : []),
     ...(wikiResults.status === "fulfilled" ? wikiResults.value : [])
   ];
   const seen = new Set();
   const results = combined.filter(result => {
-    const key = `${normalize(result.name)}:${result.type}`;
+    const key = normalize(result.name);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).slice(0, 16);
+  });
   return json({ results }, 200, 900);
 }
 
 async function searchGameData(query) {
   const upstream = new URL("/api/search", API_ORIGIN);
   upstream.searchParams.set("filter[query]", query);
+  upstream.searchParams.set("page[size]", "100");
   const payload = await fetchJson(upstream, 900);
   return (Array.isArray(payload.data) ? payload.data : [])
     .filter(group => ["items", "blueprints"].includes(group.type))
@@ -50,6 +56,24 @@ async function searchGameData(query) {
     })));
 }
 
+async function searchBaseItems(query) {
+  const upstream = new URL("/api/items", API_ORIGIN);
+  upstream.searchParams.set("filter[name]", query);
+  upstream.searchParams.set("page[size]", "100");
+  const payload = await fetchJson(upstream, 900);
+  const needle = normalize(query);
+  return (Array.isArray(payload.data) ? payload.data : [])
+    .filter(item => item.is_base_variant && normalize(item.name).includes(needle))
+    .map(item => ({
+      name: item.name,
+      itemName: item.name,
+      type: "items",
+      label: "Items",
+      meta: [item.type_label, item.classification_label, "Standard item"].filter(Boolean).join(" // "),
+      apiUrl: item.link || `${API_ORIGIN}/api/items/${encodeURIComponent(item.slug)}`,
+      webUrl: item.web_url
+    }));
+}
 async function searchWikiPages(query) {
   const url = new URL(WIKI_API);
   url.searchParams.set("action", "query");

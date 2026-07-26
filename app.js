@@ -723,7 +723,10 @@
   }
 
   async function directSearch(query, signal) {
-    const response = await fetch(`${SC_API}/search?filter[query]=${encodeURIComponent(query)}`, { signal, headers: { Accept: "application/json" } });
+    const url = new URL(`${SC_API}/search`);
+    url.searchParams.set("filter[query]", query);
+    url.searchParams.set("page[size]", "100");
+    const response = await fetch(url, { signal, headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error(`Direct search returned ${response.status}`);
     return flattenApiSearch(await response.json());
   }
@@ -749,7 +752,7 @@
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
-    }).slice(0, 14);
+    });
   }
 
   function renderSearchResults(results) {
