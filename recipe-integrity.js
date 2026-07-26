@@ -246,15 +246,12 @@
       if (replayingReview || !manifest.isEnabled?.()) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      const previous = reviewNav.disabled;
-      reviewNav.disabled = true;
       try {
         await refreshRecipes();
         replayingReview = true;
         reviewNav.click();
       } finally {
         replayingReview = false;
-        reviewNav.disabled = previous;
       }
     }, true);
 
