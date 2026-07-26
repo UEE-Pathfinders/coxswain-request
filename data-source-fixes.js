@@ -1,6 +1,7 @@
 (() => {
   const nativeFetch = window.fetch.bind(window);
-  const ITEM_API = "https://api.star-citizen.wiki/items/";
+  const API_ORIGIN = "https://api.star-citizen.wiki";
+  const ITEM_API = `${API_ORIGIN}/api/items/`;
   const WIKI_API = "https://starcitizen.tools/api.php";
   const $ = id => document.getElementById(id);
 
@@ -59,12 +60,14 @@
   ]);
 
   const itemName = entry => findText(entry, ["name", "display_name", "displayName", "title"]);
+
   const resultArray = payload => {
     if (Array.isArray(payload?.data)) return { owner: payload, key: "data", value: payload.data };
     if (Array.isArray(payload?.results)) return { owner: payload, key: "results", value: payload.results };
     if (Array.isArray(payload?.items)) return { owner: payload, key: "items", value: payload.items };
     if (Array.isArray(payload?.data?.data)) return { owner: payload.data, key: "data", value: payload.data.data };
     if (Array.isArray(payload?.data?.results)) return { owner: payload.data, key: "results", value: payload.data.results };
+    if (Array.isArray(payload?.meta?.results)) return { owner: payload.meta, key: "results", value: payload.meta.results };
     return null;
   };
 
@@ -87,7 +90,8 @@
         .trim();
       if (stripped && normalise(stripped) !== normalise(name)) candidates.add(stripped);
     }
-    return [...candidates].filter(Boolean).slice(0, 4);
+
+    return [...candidates].filter(Boolean).slice(0, 6);
   };
 
   const verifyExactItem = async candidate => {
@@ -102,9 +106,8 @@
     }
   };
 
-  const augmentItemSearchPayload = async payload => {
+  const augmentItemSearchPayload = async (payload, query) => {
     const located = resultArray(payload);
-    const query = $("itemSearch")?.value?.trim() || "";
     if (!located || !query || !located.value.length) return payload;
 
     const existing = new Set(located.value.map(entry => normalise(itemName(entry))).filter(Boolean));
@@ -128,22 +131,64 @@
     return payload;
   };
 
+  const requestUrl = input => new URL(typeof input === "string" ? input : input.url, location.href);
+
+  const requestQuery = async (input, init, url) => {
+    for (const key of ["query", "q", "search", "term", "filter[search]"]) {
+      const value = url.searchParams.get(key);
+      if (value?.trim()) return value.trim();
+    }
+
+    const pathMatch = url.pathname.match(/\/api\/search\/([^/]+)\/?$/i);
+    if (pathMatch) return decodeURIComponent(pathMatch[1]).trim();
+
+    const body = init?.body ?? (typeof input !== "string" ? input.body : null);
+    if (!body) return $("itemSearch")?.value?.trim() || "";
+
+    try {
+      if (typeof body === "string") {
+        try {
+          const json = JSON.parse(body);
+          return String(json.query ?? json.q ?? json.search ?? json.term ?? "").trim();
+        } catch {
+          const params = new URLSearchParams(body);
+          return String(params.get("query") ?? params.get("q") ?? params.get("search") ?? params.get("term") ?? "").trim();
+        }
+      }
+      if (body instanceof URLSearchParams || body instanceof FormData) {
+        return String(body.get("query") ?? body.get("q") ?? body.get("search") ?? body.get("term") ?? "").trim();
+      }
+    } catch {}
+
+    return $("itemSearch")?.value?.trim() || "";
+  };
+
+  const isSearchRequest = url => {
+    if (!/api\.star-citizen\.wiki$/i.test(url.hostname)) return false;
+    return /\/api\/(?:search(?:\/|$)|items\/search\/?$|items\/?$)/i.test(url.pathname)
+      || /^\/(?:search(?:\/|$)|items\/search\/?$|items\/?$)/i.test(url.pathname);
+  };
+
   window.fetch = async (input, init) => {
     const response = await nativeFetch(input, init);
     try {
-      const url = new URL(typeof input === "string" ? input : input.url, location.href);
-      const isItemSearch = /api\.star-citizen\.wiki$/i.test(url.hostname)
-        && /(?:^|\/)items(?:\/)?$/i.test(url.pathname)
-        && response.ok;
-      if (!isItemSearch) return response;
+      const url = requestUrl(input);
+      if (!response.ok || !isSearchRequest(url)) return response;
 
-      const payload = await augmentItemSearchPayload(await response.clone().json());
+      const query = await requestQuery(input, init, url);
+      if (!query) return response;
+
+      const payload = await augmentItemSearchPayload(await response.clone().json(), query);
+      const headers = new Headers(response.headers);
+      headers.delete("content-length");
+      headers.set("content-type", "application/json; charset=utf-8");
       return new Response(JSON.stringify(payload), {
         status: response.status,
         statusText: response.statusText,
-        headers: response.headers,
+        headers,
       });
-    } catch {
+    } catch (error) {
+      console.warn("Exact item search ranking retained original results", error);
       return response;
     }
   };
