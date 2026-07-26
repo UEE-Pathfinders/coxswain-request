@@ -123,6 +123,7 @@ export async function onRequest(context) {
 })();
 </script>
 <script src="/data-source-fixes.js" defer></script>
+<script src="/base-item-selection.js" defer></script>
 <script src="/manifest.js" defer></script>
 <script src="/recipe-integrity.js" defer></script>
 <script src="/multi-review.js" defer></script>
