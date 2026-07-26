@@ -1,7 +1,9 @@
 (() => {
   const nativeFetch = window.fetch.bind(window);
+  const nativeXhrOpen = XMLHttpRequest.prototype.open;
   const ITEM_API = "https://api.star-citizen.wiki/items/";
   const WIKI_API = "https://starcitizen.tools/api.php";
+  const SEARCH_PAGE_SIZE = "500";
   const $ = id => document.getElementById(id);
 
   const normalise = value => String(value || "")
@@ -17,6 +19,55 @@
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
+
+  const isSearchUrl = url => {
+    const host = url.hostname.toLowerCase();
+    const path = url.pathname.toLowerCase();
+    if (host === "starcitizen.tools" && url.searchParams.get("action") === "query") {
+      return url.searchParams.has("srsearch") || url.searchParams.has("gsrsearch") || url.searchParams.has("search");
+    }
+    if (host === "api.star-citizen.wiki") {
+      return path.includes("search") || [...url.searchParams.keys()].some(key => /^(q|query|search|term|filter\[search\])$/i.test(key));
+    }
+    return false;
+  };
+
+  const expandSearchUrl = input => {
+    try {
+      const url = new URL(String(input), location.href);
+      if (!isSearchUrl(url)) return String(input);
+
+      for (const key of ["limit", "per_page", "perPage", "page_size", "pageSize", "take", "size", "page[limit]", "page[size]"]) {
+        if (url.searchParams.has(key)) url.searchParams.set(key, SEARCH_PAGE_SIZE);
+      }
+
+      if (url.hostname.toLowerCase() === "starcitizen.tools") {
+        if (url.searchParams.has("srsearch")) url.searchParams.set("srlimit", "max");
+        if (url.searchParams.has("gsrsearch")) url.searchParams.set("gsrlimit", "max");
+      } else if (![...url.searchParams.keys()].some(key => /limit|per.?page|page.?size|take|size/i.test(key))) {
+        url.searchParams.set("limit", SEARCH_PAGE_SIZE);
+      }
+
+      return url.toString();
+    } catch {
+      return String(input);
+    }
+  };
+
+  window.fetch = (input, init) => {
+    if (typeof input === "string" || input instanceof URL) {
+      return nativeFetch(expandSearchUrl(input), init);
+    }
+    try {
+      const expanded = expandSearchUrl(input.url);
+      if (expanded !== input.url) return nativeFetch(new Request(expanded, input), init);
+    } catch {}
+    return nativeFetch(input, init);
+  };
+
+  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+    return nativeXhrOpen.call(this, method, expandSearchUrl(url), ...rest);
+  };
 
   const collectStrings = (value, output = [], seen = new Set()) => {
     if (typeof value === "string") {
