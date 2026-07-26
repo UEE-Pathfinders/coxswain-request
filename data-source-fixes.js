@@ -1,7 +1,6 @@
 (() => {
   const nativeFetch = window.fetch.bind(window);
   const API_ORIGIN = "https://api.star-citizen.wiki";
-  const ITEM_API = `${API_ORIGIN}/api/items/`;
   const WIKI_API = "https://starcitizen.tools/api.php";
   const $ = id => document.getElementById(id);
 
@@ -18,6 +17,21 @@
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
+
+  const directName = value => {
+    if (!value || typeof value !== "object") return "";
+    for (const key of ["name", "display_name", "displayName", "title"]) {
+      if (typeof value[key] === "string" && value[key].trim()) return value[key].trim();
+    }
+    for (const key of ["data", "item", "result"]) {
+      const child = value[key];
+      if (!child || typeof child !== "object" || Array.isArray(child)) continue;
+      for (const nameKey of ["name", "display_name", "displayName", "title"]) {
+        if (typeof child[nameKey] === "string" && child[nameKey].trim()) return child[nameKey].trim();
+      }
+    }
+    return "";
+  };
 
   const findText = (value, keys, seen = new Set()) => {
     if (!value || typeof value !== "object" || seen.has(value)) return "";
@@ -44,31 +58,40 @@
     return output;
   };
 
-  const fetchItem = async slug => {
-    const response = await nativeFetch(`${ITEM_API}${encodeURIComponent(slug)}`, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!response.ok) throw new Error(`Item lookup failed (${response.status})`);
-    return response.json();
-  };
-
   const TYPE_WORDS = new Set([
     "smg", "rifle", "pistol", "shotgun", "lmg", "sniper", "launcher", "cannon",
     "helmet", "arms", "core", "legs", "undersuit", "backpack", "armour", "armor",
     "module", "component", "generator", "cooler", "shield", "drive", "weapon", "magazine",
   ]);
 
-  const itemName = entry => findText(entry, ["name", "display_name", "displayName", "title"]);
+  const locateSearchArray = (payload, query) => {
+    const queryWords = normalise(query).split(" ").filter(Boolean);
+    let best = null;
+    const seen = new Set();
 
-  const resultArray = payload => {
-    if (Array.isArray(payload?.data)) return { owner: payload, key: "data", value: payload.data };
-    if (Array.isArray(payload?.results)) return { owner: payload, key: "results", value: payload.results };
-    if (Array.isArray(payload?.items)) return { owner: payload, key: "items", value: payload.items };
-    if (Array.isArray(payload?.data?.data)) return { owner: payload.data, key: "data", value: payload.data.data };
-    if (Array.isArray(payload?.data?.results)) return { owner: payload.data, key: "results", value: payload.data.results };
-    if (Array.isArray(payload?.meta?.results)) return { owner: payload.meta, key: "results", value: payload.meta.results };
-    return null;
+    const visit = value => {
+      if (!value || typeof value !== "object" || seen.has(value)) return;
+      seen.add(value);
+      if (Array.isArray(value)) {
+        const named = value
+          .map((entry, index) => ({ entry, index, name: directName(entry) }))
+          .filter(item => item.name);
+        if (named.length >= 2) {
+          const matching = named.filter(item => {
+            const text = normalise(item.name);
+            return queryWords.some(word => word.length > 1 && text.includes(word));
+          }).length;
+          const score = named.length + matching * 5;
+          if (matching >= 2 && (!best || score > best.score)) best = { value, score };
+        }
+        value.forEach(visit);
+        return;
+      }
+      Object.values(value).forEach(visit);
+    };
+
+    visit(payload);
+    return best?.value || null;
   };
 
   const exactCandidates = (query, entries) => {
@@ -77,7 +100,7 @@
     const candidates = new Set();
 
     for (const entry of entries) {
-      const name = itemName(entry);
+      const name = directName(entry);
       if (!name) continue;
       const words = normalise(name).split(" ");
       const type = [...words].reverse().find(word => TYPE_WORDS.has(word));
@@ -91,104 +114,104 @@
       if (stripped && normalise(stripped) !== normalise(name)) candidates.add(stripped);
     }
 
-    return [...candidates].filter(Boolean).slice(0, 6);
+    return [...candidates].filter(Boolean).slice(0, 8);
   };
 
-  const verifyExactItem = async candidate => {
-    try {
-      const payload = await fetchItem(slugify(candidate));
-      const root = payload?.data ?? payload?.result ?? payload;
-      const actual = itemName(root);
-      if (!actual || normalise(actual) !== normalise(candidate)) return null;
-      return root;
-    } catch {
-      return null;
+  const unwrapItem = payload => payload?.data?.data ?? payload?.data ?? payload?.result ?? payload?.item ?? payload;
+
+  const fetchExactItem = async candidate => {
+    const slug = slugify(candidate);
+    if (!slug) return null;
+    const routes = [`${API_ORIGIN}/items/${encodeURIComponent(slug)}`, `${API_ORIGIN}/api/items/${encodeURIComponent(slug)}`];
+    for (const route of routes) {
+      try {
+        const response = await nativeFetch(route, { headers: { Accept: "application/json" }, cache: "no-store" });
+        if (!response.ok) continue;
+        const root = unwrapItem(await response.json());
+        const actual = directName(root) || findText(root, ["name", "display_name", "displayName", "title"]);
+        if (actual && normalise(actual) === normalise(candidate)) return root;
+      } catch {}
     }
+    return null;
   };
 
-  const augmentItemSearchPayload = async (payload, query) => {
-    const located = resultArray(payload);
-    if (!located || !query || !located.value.length) return payload;
+  const compatibleRecord = (exact, template, candidate) => {
+    const record = { ...(template || {}), ...(exact || {}) };
+    const exactName = directName(exact) || findText(exact, ["name", "display_name", "displayName", "title"]) || candidate;
+    if ("name" in record || !("display_name" in record) && !("displayName" in record) && !("title" in record)) record.name = exactName;
+    if ("display_name" in record) record.display_name = exactName;
+    if ("displayName" in record) record.displayName = exactName;
+    if ("title" in record) record.title = exactName;
+    return record;
+  };
 
-    const existing = new Set(located.value.map(entry => normalise(itemName(entry))).filter(Boolean));
-    const candidates = exactCandidates(query, located.value)
-      .filter(candidate => !existing.has(normalise(candidate)));
+  const augmentSearchPayload = async (payload, query) => {
+    const results = locateSearchArray(payload, query);
+    if (!results?.length) return payload;
+
+    const existing = new Set(results.map(entry => normalise(directName(entry))).filter(Boolean));
+    const candidates = exactCandidates(query, results).filter(candidate => !existing.has(normalise(candidate)));
     if (!candidates.length) return payload;
 
-    const exact = (await Promise.all(candidates.map(verifyExactItem))).filter(Boolean);
-    if (!exact.length) return payload;
-
-    const uniqueExact = exact.filter(entry => {
-      const name = normalise(itemName(entry));
-      if (!name || existing.has(name)) return false;
+    const verified = [];
+    for (const candidate of candidates) {
+      const exact = await fetchExactItem(candidate);
+      if (!exact) continue;
+      const name = normalise(directName(exact) || findText(exact, ["name", "display_name", "displayName", "title"]));
+      if (!name || existing.has(name)) continue;
       existing.add(name);
-      return true;
-    });
-    if (!uniqueExact.length) return payload;
+      const template = results.find(entry => {
+        const item = normalise(directName(entry));
+        return normalise(candidate).split(" ").every(word => !word || item.includes(word) || TYPE_WORDS.has(word));
+      }) || results[0];
+      verified.push(compatibleRecord(exact, template, candidate));
+    }
 
-    const originalLength = located.value.length;
-    located.owner[located.key] = [...uniqueExact, ...located.value].slice(0, originalLength);
+    if (!verified.length) return payload;
+    const limit = results.length;
+    results.splice(0, results.length, ...verified, ...results);
+    results.length = Math.min(limit, results.length);
     return payload;
   };
 
-  const requestUrl = input => new URL(typeof input === "string" ? input : input.url, location.href);
-
-  const requestQuery = async (input, init, url) => {
+  const requestQuery = (input, init, url) => {
     for (const key of ["query", "q", "search", "term", "filter[search]"]) {
       const value = url.searchParams.get(key);
       if (value?.trim()) return value.trim();
     }
-
-    const pathMatch = url.pathname.match(/\/api\/search\/([^/]+)\/?$/i);
-    if (pathMatch) return decodeURIComponent(pathMatch[1]).trim();
-
-    const body = init?.body ?? (typeof input !== "string" ? input.body : null);
-    if (!body) return $("itemSearch")?.value?.trim() || "";
-
-    try {
-      if (typeof body === "string") {
-        try {
-          const json = JSON.parse(body);
-          return String(json.query ?? json.q ?? json.search ?? json.term ?? "").trim();
-        } catch {
-          const params = new URLSearchParams(body);
-          return String(params.get("query") ?? params.get("q") ?? params.get("search") ?? params.get("term") ?? "").trim();
-        }
+    const body = init?.body;
+    if (typeof body === "string") {
+      try {
+        const json = JSON.parse(body);
+        const value = json.query ?? json.q ?? json.search ?? json.term;
+        if (value) return String(value).trim();
+      } catch {
+        const params = new URLSearchParams(body);
+        const value = params.get("query") ?? params.get("q") ?? params.get("search") ?? params.get("term");
+        if (value) return value.trim();
       }
-      if (body instanceof URLSearchParams || body instanceof FormData) {
-        return String(body.get("query") ?? body.get("q") ?? body.get("search") ?? body.get("term") ?? "").trim();
-      }
-    } catch {}
-
+    }
     return $("itemSearch")?.value?.trim() || "";
-  };
-
-  const isSearchRequest = url => {
-    if (!/api\.star-citizen\.wiki$/i.test(url.hostname)) return false;
-    return /\/api\/(?:search(?:\/|$)|items\/search\/?$|items\/?$)/i.test(url.pathname)
-      || /^\/(?:search(?:\/|$)|items\/search\/?$|items\/?$)/i.test(url.pathname);
   };
 
   window.fetch = async (input, init) => {
     const response = await nativeFetch(input, init);
     try {
-      const url = requestUrl(input);
-      if (!response.ok || !isSearchRequest(url)) return response;
-
-      const query = await requestQuery(input, init, url);
+      const url = new URL(typeof input === "string" ? input : input.url, location.href);
+      if (!response.ok || !/api\.star-citizen\.wiki$/i.test(url.hostname)) return response;
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("json")) return response;
+      const query = requestQuery(input, init, url);
       if (!query) return response;
-
-      const payload = await augmentItemSearchPayload(await response.clone().json(), query);
+      const payload = await response.clone().json();
+      if (!locateSearchArray(payload, query)) return response;
+      await augmentSearchPayload(payload, query);
       const headers = new Headers(response.headers);
       headers.delete("content-length");
       headers.set("content-type", "application/json; charset=utf-8");
-      return new Response(JSON.stringify(payload), {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-      });
+      return new Response(JSON.stringify(payload), { status: response.status, statusText: response.statusText, headers });
     } catch (error) {
-      console.warn("Exact item search ranking retained original results", error);
+      console.warn("Exact item search normalisation retained original response", error);
       return response;
     }
   };
@@ -199,7 +222,6 @@
     const titleText = normalise(title);
     let score = 0;
     titleTokens(title).forEach(token => { if (text.includes(token)) score += 5; });
-
     if (titleText.includes("helmet")) {
       if (text.includes("helmet")) score += 30;
       if (/\b(arms|core|legs|set|undersuit)\b/.test(text)) score -= 60;
@@ -226,44 +248,23 @@
 
   const getScoredWikiImage = async title => {
     const parseUrl = new URL(WIKI_API);
-    parseUrl.search = new URLSearchParams({
-      action: "parse",
-      format: "json",
-      origin: "*",
-      redirects: "1",
-      prop: "images",
-      page: title,
-    });
+    parseUrl.search = new URLSearchParams({ action: "parse", format: "json", origin: "*", redirects: "1", prop: "images", page: title });
     const response = await nativeFetch(parseUrl.toString(), { cache: "no-store" });
     if (!response.ok) return "";
     const payload = await response.json();
     const filenames = Array.isArray(payload?.parse?.images) ? payload.parse.images : [];
-    const selected = filenames
-      .map(filename => ({ filename, score: imageScore(filename, title) }))
-      .sort((a, b) => b.score - a.score)[0];
+    const selected = filenames.map(filename => ({ filename, score: imageScore(filename, title) })).sort((a, b) => b.score - a.score)[0];
     if (!selected || selected.score < 1) return "";
-
-    const imagePayload = await wikiRequest({
-      prop: "imageinfo",
-      iiprop: "url",
-      titles: `File:${selected.filename}`,
-    });
+    const imagePayload = await wikiRequest({ prop: "imageinfo", iiprop: "url", titles: `File:${selected.filename}` });
     const page = Object.values(imagePayload?.query?.pages || {})[0];
     return page?.imageinfo?.[0]?.url || "";
   };
 
   const getExactItemImage = async title => {
-    const slug = slugify(title);
-    if (!slug) return "";
-    try {
-      const source = bestImageFromPayload(await fetchItem(slug), title);
-      if (source) return source;
-    } catch {}
-    try {
-      return await getScoredWikiImage(title);
-    } catch {
-      return "";
-    }
+    const exact = await fetchExactItem(title);
+    const source = exact ? bestImageFromPayload(exact, title) : "";
+    if (source) return source;
+    try { return await getScoredWikiImage(title); } catch { return ""; }
   };
 
   const setupExactImageResolver = () => {
@@ -272,13 +273,11 @@
     const status = $("imageStatus");
     const configureView = document.querySelector('.terminal-view[data-view="configure"]');
     if (!itemNameField || !image) return;
-
     let timer = 0;
     let token = 0;
     let resolvedTitle = "";
     let resolvedSource = "";
     let applying = false;
-
     const resolve = () => {
       clearTimeout(timer);
       timer = setTimeout(async () => {
@@ -296,13 +295,9 @@
         if (status) status.textContent = `STAR CITIZEN WIKI: ${title.toUpperCase()}`;
       }, 220);
     };
-
     itemNameField.addEventListener("input", resolve);
     itemNameField.addEventListener("change", resolve);
-    if (configureView) new MutationObserver(() => {
-      if (configureView.classList.contains("active")) resolve();
-    }).observe(configureView, { attributes: true, attributeFilter: ["class"] });
-
+    if (configureView) new MutationObserver(() => { if (configureView.classList.contains("active")) resolve(); }).observe(configureView, { attributes: true, attributeFilter: ["class"] });
     new MutationObserver(() => {
       if (applying || !resolvedSource || normalise(itemNameField.value) !== resolvedTitle) return;
       if (image.src !== resolvedSource) {
@@ -311,7 +306,6 @@
         applying = false;
       }
     }).observe(image, { attributes: true, attributeFilter: ["src"] });
-
     if (configureView?.classList.contains("active")) resolve();
   };
 
