@@ -139,12 +139,72 @@
     if (breadcrumb) breadcrumb.textContent = "FORUMS > CRAFTING TERMINAL > REQUEST > BASICS";
   };
 
-  const selectP8Base = async button => {
+  const TYPE_WORDS = new Set([
+    "smg", "rifle", "pistol", "shotgun", "lmg", "sniper", "launcher", "cannon",
+    "helmet", "arms", "core", "legs", "undersuit", "backpack", "armour", "armor",
+    "module", "component", "generator", "cooler", "shield", "drive", "quantum", "weapon",
+  ]);
+
+  const stripVariantDecoration = title => String(title || "")
+    .replace(/\s*[“\"][^”\"]+[”\"]\s*/g, " ")
+    .replace(/\s*\([^)]*(?:variant|edition|paint|skin|colour|color)?[^)]*\)\s*/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const itemTypeFromTitle = title => {
+    const words = normalise(title).split(" ");
+    return words.findLast?.(word => TYPE_WORDS.has(word)) || [...words].reverse().find(word => TYPE_WORDS.has(word)) || "";
+  };
+
+  const candidateBaseTitles = (query, cards) => {
+    const candidates = new Set();
+    const cleanQuery = String(query || "").trim();
+    const queryNorm = normalise(cleanQuery);
+
+    for (const card of cards) {
+      const title = card.querySelector("strong")?.textContent?.trim() || "";
+      if (!title) continue;
+      const stripped = stripVariantDecoration(title);
+      if (stripped && normalise(stripped) !== normalise(title)) candidates.add(stripped);
+
+      const type = itemTypeFromTitle(title);
+      if (type && queryNorm && !queryNorm.split(" ").includes(type)) {
+        candidates.add(`${cleanQuery} ${type.toUpperCase()}`.replace(/\s+/g, " ").trim());
+      }
+    }
+
+    return [...candidates].filter(Boolean);
+  };
+
+  const verifyBaseCandidate = async title => {
+    const slug = slugify(title);
+    if (!slug) return null;
+    try {
+      const payload = await fetchItem(slug);
+      const root = payload?.data ?? payload?.result ?? payload;
+      const actualName = findText(root, ["name", "display_name", "title"]);
+      if (!actualName) return null;
+      const requested = normalise(title);
+      const actual = normalise(actualName);
+      if (actual !== requested && !actual.startsWith(requested) && !requested.startsWith(actual)) return null;
+      return { title: actualName, slug, payload: root };
+    } catch {
+      try {
+        const payload = await wikiRequest({ redirects: "1", prop: "info", titles: title });
+        const page = Object.values(payload?.query?.pages || {})[0];
+        if (!page || page.missing != null || page.invalid != null) return null;
+        return { title: page.title || title, slug: slugify(page.title || title), payload: null };
+      } catch {
+        return null;
+      }
+    }
+  };
+
+  const selectExactBase = async (record, button) => {
     button.disabled = true;
     try {
-      const payload = await fetchItem("p8-sc-smg");
-      const root = payload?.data ?? payload?.result ?? payload;
-      const name = findText(root, ["name", "display_name", "title"]) || "P8-SC SMG";
+      const root = record.payload || (await fetchItem(record.slug))?.data || await fetchItem(record.slug);
+      const name = findText(root, ["name", "display_name", "title"]) || record.title;
       const description = findText(root, ["description", "short_description"]);
       const image = bestImageFromPayload(root, name) || await getExactItemImage(name);
       showConfigure();
@@ -156,44 +216,64 @@
         $("configureImage").dataset.exactItemImage = image;
       }
       const status = $("imageStatus");
-      if (status) status.textContent = "STAR CITIZEN WIKI: P8-SC SMG";
+      if (status) status.textContent = `STAR CITIZEN WIKI: ${name.toUpperCase()}`;
       const source = $("sourceReadout");
-      if (source) source.textContent = "SOURCE: Star Citizen Wiki API // EXACT BASE VARIANT";
+      if (source) source.textContent = "SOURCE: Star Citizen Wiki API // VERIFIED BASE ITEM";
     } catch (error) {
-      console.warn("Unable to load exact P8-SC base item", error);
+      console.warn(`Unable to load verified base item ${record.title}`, error);
       button.disabled = false;
     }
   };
 
-  const ensureP8BaseResult = () => {
-    const query = normalise($("itemSearch")?.value);
-    const list = $("searchResults");
-    if (!list || !/^p8 sc(?: smg)?$/.test(query)) return;
-    const existing = [...list.querySelectorAll(".result-card")].some(card => normalise(card.textContent).includes("p8 sc smg") && !/["“](warhawk|midnight|nightstalker|red alert|epoque|desert shadow|stormfall|boneyard)/i.test(card.textContent));
-    if (existing || list.querySelector('[data-exact-base="p8-sc-smg"]')) return;
+  const baseDiscoveryState = { generation: 0, signatures: new Set() };
 
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "result-card";
-    card.dataset.exactBase = "p8-sc-smg";
-    const name = document.createElement("strong");
-    name.textContent = "P8-SC SMG";
-    const meta = document.createElement("span");
-    meta.textContent = "Behring Applied Technology // BASE VARIANT";
-    const tag = document.createElement("b");
-    tag.textContent = "EXACT ITEM";
-    card.append(name, meta, tag);
-    card.addEventListener("click", () => selectP8Base(card));
-    list.prepend(card);
+  const discoverBaseResults = async () => {
+    const list = $("searchResults");
+    const query = $("itemSearch")?.value?.trim() || "";
+    if (!list || !query) return;
+
+    const cards = [...list.querySelectorAll(".result-card:not([data-verified-base])")];
+    const candidates = candidateBaseTitles(query, cards);
+    if (!candidates.length) return;
+
+    const generation = ++baseDiscoveryState.generation;
+    const existingTitles = new Set([...list.querySelectorAll(".result-card strong")].map(node => normalise(node.textContent)));
+    const records = (await Promise.all(candidates.map(verifyBaseCandidate))).filter(Boolean);
+    if (generation !== baseDiscoveryState.generation || normalise($("itemSearch")?.value) !== normalise(query)) return;
+
+    for (const record of records) {
+      const signature = `${normalise(query)}|${normalise(record.title)}`;
+      if (existingTitles.has(normalise(record.title)) || baseDiscoveryState.signatures.has(signature)) continue;
+      baseDiscoveryState.signatures.add(signature);
+
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "result-card";
+      card.dataset.verifiedBase = record.slug;
+      const name = document.createElement("strong");
+      name.textContent = record.title;
+      const meta = document.createElement("span");
+      meta.textContent = "VERIFIED EXACT BASE ITEM";
+      const tag = document.createElement("b");
+      tag.textContent = "BASE ITEM";
+      card.append(name, meta, tag);
+      card.addEventListener("click", () => selectExactBase(record, card));
+      list.prepend(card);
+      existingTitles.add(normalise(record.title));
+    }
   };
 
   const setupSearchBase = () => {
     const form = $("searchForm");
     const list = $("searchResults");
-    form?.addEventListener("submit", () => setTimeout(ensureP8BaseResult, 0));
-    $("itemSearch")?.addEventListener("input", () => setTimeout(ensureP8BaseResult, 0));
-    if (list) new MutationObserver(ensureP8BaseResult).observe(list, { childList: true, subtree: true });
-    ensureP8BaseResult();
+    const queue = () => setTimeout(discoverBaseResults, 40);
+    form?.addEventListener("submit", queue);
+    $("itemSearch")?.addEventListener("input", () => {
+      baseDiscoveryState.generation += 1;
+      queue();
+    });
+    if (list) new MutationObserver(queue).observe(list, { childList: true, subtree: true });
+    queue();
   };
 
   const setupExactImageResolver = () => {
