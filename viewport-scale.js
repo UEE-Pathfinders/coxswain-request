@@ -81,8 +81,13 @@
     }
 
     /* Preserve native desktop geometry after responsive media queries fire. */
-    .step-nav { grid-template-columns: repeat(4, 1fr) !important; }
-    .step-nav button { font-size: inherit !important; }
+    .step-nav { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    .step-nav.manifest-enabled { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+    .step-nav button {
+      min-width: 0 !important;
+      white-space: nowrap !important;
+      font-size: inherit !important;
+    }
     .configure-grid { grid-template-columns: .82fr 1.18fr !important; }
     .materials-details-grid { grid-template-columns: 1.22fr .78fr !important; }
     .request-parameters-grid,
