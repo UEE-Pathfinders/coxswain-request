@@ -128,6 +128,7 @@ export async function onRequest(context) {
 <script src="/multi-review.js" defer></script>
 <script src="/review-bridge.js" defer></script>
 <script src="/review-image-sync.js" defer></script>
+<script src="/export-image-sync.js" defer></script>
 <script src="/portrait-bezel-export.js" defer></script>
 <script src="/multi-export.js" defer></script>
 <script src="/viewport-scale.js" defer></script>`;
