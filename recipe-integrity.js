@@ -46,35 +46,57 @@
     return [...totals.values()].sort((a, b) => String(a.name).localeCompare(String(b.name)));
   };
 
+  const entryName = entry => entry?.name
+    || entry?.resource?.name
+    || entry?.item?.name
+    || entry?.commodity?.name
+    || entry?.material?.name
+    || entry?.resource_name
+    || entry?.ingredient_name
+    || "";
+
+  const entryAmount = entry => entry?.quantity_scu
+    ?? entry?.amount_scu
+    ?? entry?.quantity
+    ?? entry?.amount
+    ?? entry?.value
+    ?? entry?.required_quantity;
+
+  const looksLikeRecipeArray = value => Array.isArray(value)
+    && value.length > 0
+    && value.every(entry => entry && typeof entry === "object" && entryName(entry) && entryAmount(entry) != null);
+
   const findIngredients = payload => {
     const root = payload?.data ?? payload?.result ?? payload;
     const directCandidates = [
+      root?.inputs,
       root?.ingredients,
+      root?.blueprint?.inputs,
       root?.blueprint?.ingredients,
+      root?.data?.inputs,
       root?.data?.ingredients,
+      root?.attributes?.inputs,
       root?.attributes?.ingredients,
     ];
     for (const candidate of directCandidates) {
-      if (Array.isArray(candidate) && candidate.length) return candidate;
+      if (looksLikeRecipeArray(candidate)) return candidate;
     }
 
     const seen = new Set();
     const walk = value => {
       if (!value || typeof value !== "object" || seen.has(value)) return null;
       seen.add(value);
+      if (looksLikeRecipeArray(value)) return value;
       if (Array.isArray(value)) {
-        const looksLikeIngredients = value.length > 0 && value.every(entry =>
-          entry && typeof entry === "object" && entry.name &&
-          (entry.quantity_scu != null || entry.quantity != null || entry.amount != null)
-        );
-        if (looksLikeIngredients) return value;
         for (const entry of value) {
           const found = walk(entry);
           if (found) return found;
         }
         return null;
       }
-      if (Array.isArray(value.ingredients) && value.ingredients.length) return value.ingredients;
+      for (const key of ["inputs", "ingredients"]) {
+        if (looksLikeRecipeArray(value[key])) return value[key];
+      }
       for (const child of Object.values(value)) {
         const found = walk(child);
         if (found) return found;
@@ -86,14 +108,14 @@
 
   const mapIngredients = (ingredients, quality) => ingredients
     .map(ingredient => {
-      const perItem = ingredient.quantity_scu ?? ingredient.amount_scu ?? ingredient.quantity ?? ingredient.amount;
-      const unit = ingredient.quantity_scu != null || ingredient.amount_scu != null
-        ? "SCU"
-        : (ingredient.unit || ingredient.measurement || "units");
+      const perItem = entryAmount(ingredient);
+      const explicitScu = ingredient.quantity_scu != null
+        || ingredient.amount_scu != null
+        || /scu/i.test(String(ingredient.unit || ingredient.measurement || ""));
       return {
-        name: String(ingredient.name || ingredient.ingredient_name || "").trim(),
+        name: String(entryName(ingredient)).trim(),
         perItem: numberValue(perItem, 0),
-        unit: String(unit || "").trim(),
+        unit: explicitScu ? "SCU" : String(ingredient.unit || ingredient.measurement || "units").trim(),
         quality: String(quality || ingredient.quality || ingredient.min_quality || "").trim(),
       };
     })
@@ -110,6 +132,43 @@
     const payload = await response.json();
     const materials = mapIngredients(findIngredients(payload), item.quality);
     return materials.length ? materials : null;
+  };
+
+  const dispatchValue = (element, value) => {
+    if (!element) return;
+    element.value = value ?? "";
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
+  const applyMaterialsToEditor = materials => {
+    const editor = $("materialsEditor");
+    const addButton = $("addMaterialButton");
+    if (!editor || !addButton || !Array.isArray(materials) || !materials.length) return false;
+
+    let rows = [...editor.querySelectorAll(".material-row")];
+    while (rows.length < materials.length) {
+      addButton.click();
+      rows = [...editor.querySelectorAll(".material-row")];
+      if (rows.length === 0) break;
+    }
+    while (rows.length > materials.length) {
+      const row = rows.at(-1);
+      const remove = row?.querySelector("button");
+      if (remove) remove.click();
+      else row?.remove();
+      rows = [...editor.querySelectorAll(".material-row")];
+    }
+
+    rows.forEach((row, index) => {
+      const material = materials[index];
+      const inputs = [...row.querySelectorAll("input, select")];
+      dispatchValue(row.querySelector(".material-name") || inputs[0], material.name);
+      dispatchValue(row.querySelector(".material-amount, .material-quantity") || inputs[1], material.perItem);
+      dispatchValue(row.querySelector(".material-unit") || inputs[2], material.unit);
+      dispatchValue(row.querySelector(".material-quality") || inputs[3], material.quality);
+    });
+    return true;
   };
 
   const setup = () => {
@@ -203,6 +262,39 @@
     document.addEventListener("coxswain:recipes-refreshed", event => {
       if (status) status.textContent = `BLUEPRINT RECIPES VERIFIED // ${event.detail.itemCount} ITEMS // ${event.detail.materialCount} MATERIAL LINES`;
     });
+
+    const itemName = $("itemName");
+    const quality = $("globalQuality");
+    let configureTimer = 0;
+    let configureRequest = 0;
+    const refreshConfigureRecipe = () => {
+      clearTimeout(configureTimer);
+      const requestedName = itemName?.value?.trim();
+      if (!requestedName) return;
+      configureTimer = setTimeout(async () => {
+        const requestId = ++configureRequest;
+        try {
+          const materials = await fetchRecipe({ name: requestedName, quality: quality?.value || "" });
+          if (requestId !== configureRequest || normalise(itemName?.value) !== normalise(requestedName) || !materials) return;
+          applyMaterialsToEditor(materials);
+          const source = $("sourceReadout");
+          if (source) source.textContent = `${source.textContent.replace(/\s*\/\/\s*BLUEPRINT RECIPE VERIFIED.*$/i, "")} // BLUEPRINT RECIPE VERIFIED`;
+        } catch (error) {
+          console.warn(`Configure recipe validation retained loaded materials for ${requestedName}`, error);
+        }
+      }, 350);
+    };
+
+    itemName?.addEventListener("change", refreshConfigureRecipe);
+    itemName?.addEventListener("input", refreshConfigureRecipe);
+    document.querySelector('[data-step="configure"]')?.addEventListener("click", () => setTimeout(refreshConfigureRecipe, 50));
+    const configureView = document.querySelector('.terminal-view[data-view="configure"]');
+    if (configureView) {
+      new MutationObserver(() => {
+        if (configureView.classList.contains("active")) refreshConfigureRecipe();
+      }).observe(configureView, { attributes: true, attributeFilter: ["class"] });
+    }
+    if (configureView?.classList.contains("active")) refreshConfigureRecipe();
   };
 
   if (document.readyState === "loading") {
