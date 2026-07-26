@@ -7,10 +7,19 @@
     button.dataset.manifestReviewBridge = "true";
     original.replaceWith(button);
 
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const manifest = window.coxswainManifest;
-      if (manifest?.isEnabled?.() && !manifest.commitCurrentForReview?.()) return;
-      document.querySelector('[data-step="review"]')?.click();
+      const previous = button.disabled;
+      button.disabled = true;
+      try {
+        if (manifest?.isEnabled?.()) {
+          const committed = await manifest.commitCurrentForReview?.();
+          if (!committed) return;
+        }
+        document.querySelector('[data-step="review"]')?.click();
+      } finally {
+        button.disabled = previous;
+      }
     });
   };
 
