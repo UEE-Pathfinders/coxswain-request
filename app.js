@@ -696,7 +696,10 @@
     try {
       let remote = [];
       try {
-        const response = await fetch(`${API_ENDPOINT}?q=${encodeURIComponent(query)}`, { signal: searchController.signal, cache: "no-store" });
+        const searchUrl = new URL(API_ENDPOINT, location.origin);
+        searchUrl.searchParams.set("q", query);
+        searchUrl.searchParams.set("_", String(Date.now()));
+        const response = await fetch(searchUrl, { signal: searchController.signal, cache: "no-store" });
         if (!response.ok) throw new Error(`Proxy returned ${response.status}`);
         remote = (await response.json()).results || [];
       } catch (proxyError) {
