@@ -1,14 +1,17 @@
 const API_ORIGIN = "https://api.star-citizen.wiki";
 const WIKI_API = "https://starcitizen.tools/api.php";
-const ALLOWED_IMAGE_HOSTS = ["starcitizen.tools", "star-citizen.wiki", "static.wikia.nocookie.net", "wikia.nocookie.net", "cloudfront.net"];
+const ALLOWED_IMAGE_HOSTS = ["starcitizen.tools", "star-citizen.wiki", "static.wikia.nocookie.net", "wikia.nocookie.net"];
+// Served back under our own origin, so the proxy must only ever emit a real
+// raster image. SVG is excluded deliberately — it can carry script.
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"];
 
 export async function onRequestGet(context) {
   const url = new URL(context.request.url);
   const mode = url.searchParams.get("mode") || "search";
   try {
-    if (mode === "image") return proxyImage(url);
-    if (mode === "detail") return getDetail(url);
-    return search(url);
+    if (mode === "image") return await proxyImage(url);
+    if (mode === "detail") return await getDetail(url);
+    return await search(url);
   } catch (error) {
     return json({ error: error.message || "Lookup failed" }, 502);
   }
@@ -221,7 +224,9 @@ async function proxyImage(requestUrl) {
   if (imageUrl.protocol !== "https:" || !ALLOWED_IMAGE_HOSTS.some(host => imageUrl.hostname === host || imageUrl.hostname.endsWith(`.${host}`))) return json({ error: "Image host is not allowed." }, 400);
   const response = await fetch(imageUrl.toString(), { headers: { "User-Agent": "CoxswainRequestTerminal/2.0" }, cf: { cacheTtl: 86400, cacheEverything: true } });
   if (!response.ok) return json({ error: `Image upstream returned ${response.status}` }, 502);
-  return new Response(response.body, { status: 200, headers: { "Content-Type": response.headers.get("Content-Type") || "image/jpeg", "Cache-Control": "public, max-age=86400" } });
+  const contentType = (response.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+  if (!ALLOWED_IMAGE_TYPES.includes(contentType)) return json({ error: "Image upstream did not return an image." }, 502);
+  return new Response(response.body, { status: 200, headers: { "Content-Type": contentType, "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff" } });
 }
 
 function pickBlueprint(data) { if (data?.ingredients || data?.requirement_groups) return data; const candidates = Array.isArray(data?.blueprint) ? data.blueprint : data?.blueprint ? [data.blueprint] : []; return candidates[0] || null; }
