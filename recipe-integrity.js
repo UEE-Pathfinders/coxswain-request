@@ -134,6 +134,10 @@
     return materials.length ? materials : null;
   };
 
+  // Set while applyMaterialsToEditor drives the editor, so the synthetic click
+  // and input events it generates are not mistaken for hand edits by the user.
+  let applyingMaterials = false;
+
   const dispatchValue = (element, value) => {
     if (!element) return;
     element.value = value ?? "";
@@ -146,28 +150,33 @@
     const addButton = $("addMaterialButton");
     if (!editor || !addButton || !Array.isArray(materials) || !materials.length) return false;
 
-    let rows = [...editor.querySelectorAll(".material-row")];
-    while (rows.length < materials.length) {
-      addButton.click();
-      rows = [...editor.querySelectorAll(".material-row")];
-      if (rows.length === 0) break;
-    }
-    while (rows.length > materials.length) {
-      const row = rows.at(-1);
-      const remove = row?.querySelector("button");
-      if (remove) remove.click();
-      else row?.remove();
-      rows = [...editor.querySelectorAll(".material-row")];
-    }
+    applyingMaterials = true;
+    try {
+      let rows = [...editor.querySelectorAll(".material-row")];
+      while (rows.length < materials.length) {
+        addButton.click();
+        rows = [...editor.querySelectorAll(".material-row")];
+        if (rows.length === 0) break;
+      }
+      while (rows.length > materials.length) {
+        const row = rows.at(-1);
+        const remove = row?.querySelector("button");
+        if (remove) remove.click();
+        else row?.remove();
+        rows = [...editor.querySelectorAll(".material-row")];
+      }
 
-    rows.forEach((row, index) => {
-      const material = materials[index];
-      const inputs = [...row.querySelectorAll("input, select")];
-      dispatchValue(row.querySelector(".material-name") || inputs[0], material.name);
-      dispatchValue(row.querySelector(".material-amount, .material-quantity") || inputs[1], material.perItem);
-      dispatchValue(row.querySelector(".material-unit") || inputs[2], material.unit);
-      dispatchValue(row.querySelector(".material-quality") || inputs[3], material.quality);
-    });
+      rows.forEach((row, index) => {
+        const material = materials[index];
+        const inputs = [...row.querySelectorAll("input, select")];
+        dispatchValue(row.querySelector(".material-name") || inputs[0], material.name);
+        dispatchValue(row.querySelector(".material-amount, .material-quantity") || inputs[1], material.perItem);
+        dispatchValue(row.querySelector(".material-unit") || inputs[2], material.unit);
+        dispatchValue(row.querySelector(".material-quality") || inputs[3], material.quality);
+      });
+    } finally {
+      applyingMaterials = false;
+    }
     return true;
   };
 
@@ -264,6 +273,21 @@
     const quality = $("globalQuality");
     let configureTimer = 0;
     let configureRequest = 0;
+
+    // Blueprint auto-fill must never discard materials the user typed by hand.
+    // Track manual edits to the editor and only auto-fill when the lookup is for
+    // an item we have not already filled, so a late-returning request cannot
+    // overwrite work done while it was in flight.
+    let lastAppliedName = "";
+    let userEditedMaterials = false;
+    const markUserEdit = () => { if (!applyingMaterials) userEditedMaterials = true; };
+    const materialsEditor = $("materialsEditor");
+    materialsEditor?.addEventListener("input", markUserEdit);
+    materialsEditor?.addEventListener("click", event => {
+      if (event.target.closest("[data-remove-material]")) markUserEdit();
+    });
+    $("addMaterialButton")?.addEventListener("click", markUserEdit);
+
     const refreshConfigureRecipe = () => {
       clearTimeout(configureTimer);
       const requestedName = itemName?.value?.trim();
@@ -273,7 +297,10 @@
         try {
           const materials = await fetchRecipe({ name: requestedName, quality: quality?.value || "" });
           if (requestId !== configureRequest || normalise(itemName?.value) !== normalise(requestedName) || !materials) return;
-          applyMaterialsToEditor(materials);
+          if (userEditedMaterials && normalise(requestedName) === lastAppliedName) return;
+          if (!applyMaterialsToEditor(materials)) return;
+          lastAppliedName = normalise(requestedName);
+          userEditedMaterials = false;
           const source = $("sourceReadout");
           if (source) source.textContent = `${source.textContent.replace(/\s*\/\/\s*BLUEPRINT RECIPE VERIFIED.*$/i, "")} // BLUEPRINT RECIPE VERIFIED`;
         } catch (error) {
