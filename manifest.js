@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_KEY = "coxswain-request-manifest-v1";
   const LIMIT = 10;
+  const FALLBACK_THUMB = "assets/fallbacks/component.png";
 
   const $ = (id) => document.getElementById(id);
   const normalise = (value) => String(value || "").trim().toLowerCase();
@@ -230,7 +231,10 @@
       const image = document.createElement("img");
       image.className = "manifest-thumb";
       image.alt = "";
-      image.src = item.image || "assets/component-schematic.png";
+      image.src = item.image || FALLBACK_THUMB;
+      image.addEventListener("error", () => {
+        if (!image.src.endsWith(FALLBACK_THUMB)) image.src = FALLBACK_THUMB;
+      });
 
       const copy = document.createElement("div");
       copy.className = "manifest-copy";

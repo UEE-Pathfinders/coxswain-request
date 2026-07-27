@@ -5,6 +5,14 @@
     return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(/0+$/, "").replace(/\.$/, "");
   };
 
+  const FALLBACK_THUMB = "assets/fallbacks/component.png";
+  const setThumb = (image, source) => {
+    image.src = source || FALLBACK_THUMB;
+    image.addEventListener("error", () => {
+      if (!image.src.endsWith(FALLBACK_THUMB)) image.src = FALLBACK_THUMB;
+    });
+  };
+
   const style = document.createElement("style");
   style.textContent = `
     .multi-request-output { min-height: 430px; }
@@ -82,7 +90,7 @@
       const card = make("article", "multi-item-card");
       const image = make("img");
       image.alt = "";
-      image.src = item.image || "assets/component-schematic.png";
+      setThumb(image, item.image);
       const copy = document.createElement("div");
       copy.append(
         make("b", "", `${item.quantity} ×`),
@@ -101,7 +109,7 @@
       const row = make("article", "multi-item-row");
       const image = make("img");
       image.alt = "";
-      image.src = item.image || "assets/component-schematic.png";
+      setThumb(image, item.image);
       row.append(
         image,
         make("b", "", `${item.quantity}×`),
